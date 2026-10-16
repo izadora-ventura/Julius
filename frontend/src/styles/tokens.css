@@ -86,7 +86,9 @@
   }
 }
 
-:root[data-theme="dark"] {
+/* .auth: a tela de login tem fundo escuro fixo, então usa os tokens escuros em qualquer tema */
+:root[data-theme="dark"],
+.auth {
   --bg: #0c0f0d;
   --surface: #151a17;
   --surface-2: #1c221f;
