@@ -60,6 +60,19 @@ it("sincroniza em ordem e reenvia o MESMO id (idempotente)", async () => {
   expect(await localDb.outbox.count()).toBe(0);
 });
 
+it("itens criados no mesmo instante (inclusive em paralelo) nunca empatam na ordem da fila", async () => {
+  setOnline(false);
+  vi.spyOn(Date, "now").mockReturnValue(1_000);
+  await Promise.all([1, 2, 3, 4, 5].map((n) => createTransaction({ ...body, description: `item ${n}` })));
+  await createTransaction({ ...body, description: "depois" });
+  vi.restoreAllMocks();
+  const times = (await localDb.outbox.orderBy("createdAt").toArray()).map((i) => i.createdAt);
+  expect(new Set(times).size).toBe(6);
+  expect(times.at(-1)).toBe(Math.max(...times));
+  const last = await localDb.outbox.orderBy("createdAt").last();
+  expect(last?.label).toBe("depois");
+});
+
 it("edição offline leva a versão em que foi feita", async () => {
   setOnline(false);
   await updateTransaction(tx, { amount_cents: 1500 });

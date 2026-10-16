@@ -62,10 +62,13 @@ const isOffline = (err: unknown) => err instanceof ApiError && err.offline;
 export type CreateResult = { queued: false; tx: Transaction } | { queued: true; id: string };
 
 /** createdAt estritamente crescente: Date.now() tem resolução de ms e itens
- *  criados no mesmo milissegundo empatariam, perdendo a ordem da fila. */
+ *  criados no mesmo milissegundo empatariam, perdendo a ordem da fila.
+ *  `lastIssued` cobre chamadas simultâneas, que leriam o mesmo "último" do banco. */
+let lastIssued = 0;
 async function nextCreatedAt(): Promise<number> {
   const last = await localDb.outbox.orderBy("createdAt").last();
-  return Math.max(Date.now(), (last?.createdAt ?? 0) + 1);
+  lastIssued = Math.max(Date.now(), (last?.createdAt ?? 0) + 1, lastIssued + 1);
+  return lastIssued;
 }
 
 /** Cria um lançamento; sem conexão, guarda na fila e sincroniza depois. */
