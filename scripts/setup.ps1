@@ -21,9 +21,11 @@ if (-not (Test-Path "$root\backend\.env")) {
     $bytes = New-Object byte[] 48
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $secret = [Convert]::ToBase64String($bytes)
-    $envContent = Get-Content "$root\backend\.env" -Raw
+    # UTF-8 sem BOM nas duas pontas: Get-Content/Set-Content do PowerShell 5.1 trocariam os acentos
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $envContent = [IO.File]::ReadAllText("$root\backend\.env", $utf8)
     $envContent = $envContent -replace '(?m)^SECRET_KEY=.*$', "SECRET_KEY=$secret"
-    Set-Content -Path "$root\backend\.env" -Value $envContent -NoNewline -Encoding utf8
+    [IO.File]::WriteAllText("$root\backend\.env", $envContent, $utf8)
 }
 
 Push-Location "$root\backend"; & "$venv\Scripts\alembic.exe" upgrade head; Pop-Location

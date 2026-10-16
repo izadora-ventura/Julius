@@ -1,7 +1,5 @@
-﻿-r requirements.txt
-pytest>=8,<9
-ruff>=0.6
-
-pre-commit>=4.3,<5
-
+-r requirements.txt
+pytest>=9.0.3,<10  # 9.0.3 corrige GHSA-6w46-j5rx-g56g (tmpdir)
 pytest-cov>=6.0,<7
+ruff>=0.6
+pre-commit>=4.3,<5

@@ -261,15 +261,15 @@ def upgrade() -> None:
         batch_op.create_foreign_key(
             batch_op.f("fk_transactions_debt_id_debts"), "debts", ["debt_id"], ["id"], ondelete="SET NULL"
         )
-        # Novos status: confirmado e cancelado (autogenerate nÃ£o detecta mudanÃ§a em CHECK)
+        # Novos status: confirmado e cancelado (autogenerate não detecta mudança em CHECK)
         batch_op.drop_constraint(op.f("ck_transactions_tx_status"), type_="check")
         batch_op.create_check_constraint("tx_status", NEW_STATUS)
         batch_op.create_check_constraint("debt_pair", "(debt_id IS NULL) = (debt_installment IS NULL)")
 
 
 def downgrade() -> None:
-    # O esquema antigo sÃ³ conhece "paid"/"pending": confirmados voltam a previstos e
-    # cancelados viram previstos EXCLUÃDOS (exclusÃ£o lÃ³gica â€” nada Ã© apagado).
+    # O esquema antigo só conhece "paid"/"pending": confirmados voltam a previstos e
+    # cancelados viram previstos EXCLUÍDOS (exclusão lógica — nada é apagado).
     op.execute("UPDATE transactions SET status = 'pending' WHERE status = 'confirmed'")
     op.execute(
         "UPDATE transactions SET status = 'pending', deleted_at = CURRENT_TIMESTAMP "
