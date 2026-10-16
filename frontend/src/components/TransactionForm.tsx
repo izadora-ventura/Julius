@@ -82,9 +82,12 @@ interface Props {
   onDone: (tx?: Transaction) => void;
 }
 
+// Referência estável: um `[]` novo a cada render dispararia o useEffect abaixo à toa
+const NO_ACCOUNTS: Account[] = [];
+
 export function TransactionForm({ initial, editing, source = "manual", onDone }: Props) {
   const toast = useToast();
-  const accounts = useAccounts().data ?? [];
+  const accounts = useAccounts().data ?? NO_ACCOUNTS;
   const categories = useCategories().data ?? [];
   const base = editing ?? initial ?? {};
 
