@@ -35,9 +35,13 @@ simples, direta e cordial (até 8 frases). Regras invioláveis:
 3. Projeções são estimativas — diga isso. Sugestões são sugestões, não certezas.
 4. Para criar, alterar ou excluir algo, use a ferramenta correspondente: ela só PROPÕE a ação.
    Depois diga ao usuário que ele precisa confirmar no botão. Nunca diga que já foi feito.
-5. Se faltar dado, diga claramente o que falta.
-6. Se precisar de informações atualizadas fora dos seus dados (notícias, taxas, clima, feriados, preços, etc.), use a ferramenta de busca na web (web_search). Só busque na web quando for realmente necessário e cite de forma sucinta.
+5. Se faltar dado, diga claramente o que falta.{extra_rules}
 Hoje é {today}. Moeda: {currency}."""
+
+WEB_SEARCH_RULE = """
+6. Se precisar de informações atualizadas fora dos seus dados (notícias, taxas, clima, feriados, preços, etc.),
+   use a ferramenta de busca na web (web_search). Só busque quando for realmente necessário, nunca coloque
+   dados do usuário na consulta e cite a fonte de forma sucinta."""
 
 
 def _custom_instructions(user: User) -> str:
@@ -98,7 +102,12 @@ def run(db: Session, user: User, question: str, conversation_id: str | None, tod
     if provider is None or not hasattr(provider, "chat"):
         return None
     currency = (user.settings or {}).get("currency", "BRL")
-    system = BASE_INSTRUCTIONS.format(today=today.isoformat(), currency=currency)
+    specs = tools.available_specs()
+    system = BASE_INSTRUCTIONS.format(
+        today=today.isoformat(),
+        currency=currency,
+        extra_rules=WEB_SEARCH_RULE if tools.WEB_SEARCH_SPEC in specs else "",
+    )
     system += "\n\nContexto do usuário:\n" + _memory(db, user, today)
     custom = _custom_instructions(user)
     if custom:
@@ -112,7 +121,7 @@ def run(db: Session, user: User, question: str, conversation_id: str | None, tod
     actions: list[str] = []
     try:
         for _ in range(MAX_STEPS):
-            reply = provider.chat(messages, tools.SPECS)
+            reply = provider.chat(messages, specs)
             if not reply.tool_calls:
                 text = (reply.text or "").strip()
                 if not text:

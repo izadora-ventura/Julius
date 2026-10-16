@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Configuração lida de variáveis de ambiente / arquivo .env.
 
 Nenhum segredo tem valor padrão utilizável em produção: se APP_ENV=production
@@ -56,8 +55,6 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     serper_api_key: str = ""
     brave_api_key: str = ""
-    google_search_api_key: str = ""
-    google_cse_id: str = ""
 
     max_upload_mb: int = 8
     # Onde guardar arquivos de documentos: "db" (no banco) ou "local" (pasta STORAGE_DIR)

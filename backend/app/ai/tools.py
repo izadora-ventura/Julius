@@ -12,6 +12,8 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai import web_search
+from app.config import get_settings
 from app.models import Account, AIAction, Category, Recurrence, Transaction, User
 from app.models.base import utcnow
 from app.schemas import RecurrenceIn, TransactionIn, TransactionUpdate
@@ -147,6 +149,24 @@ SPECS: list[dict] = [
 ]
 WRITE_TOOLS = {"create_transaction", "update_transaction", "delete_transaction", "create_future_expense"}
 
+# Opcional (WEB_SEARCH_ENABLED): só é oferecida à IA quando ligada nas configurações
+WEB_SEARCH_SPEC: dict = {
+    "name": "web_search",
+    "description": (
+        "Busca na internet informações públicas e atuais (taxas, índices, feriados, notícias, preços). "
+        "NUNCA inclua na consulta nomes, valores, contas ou outros dados do usuário."
+    ),
+    "parameters": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {"query": {"type": "string", "description": "Termos da busca"}},
+    },
+}
+
+
+def available_specs() -> list[dict]:
+    return [*SPECS, WEB_SEARCH_SPEC] if get_settings().web_search_enabled else SPECS
+
 
 class ToolError(Exception):
     pass
@@ -210,6 +230,12 @@ def _desc(user: User, tx: Transaction, cat_names: dict[str, str]) -> str:
 
 def _read(db: Session, user: User, name: str, args: dict, today: date) -> dict:
     uid = user.id
+    if name == "web_search":
+        try:
+            res = web_search.search_web(str(args.get("query") or ""))
+        except web_search.WebSearchError as exc:
+            raise ToolError(str(exc)) from exc
+        return {"provider": res["provider"], "query": res["query"], "results": res["results"]}
     start = _date(args.get("start"), month_start(today))
     end = _date(args.get("end"), today)
     if name == "get_balance":
