@@ -65,6 +65,8 @@ Copie `backend/.env.example` para `backend/.env`. Principais variáveis:
 | `OPENAI_API_KEY` / `OPENAI_BASE_URL` | — | Para provedores compatíveis com OpenAI |
 | `AI_MODEL` | padrão do provedor | Ex.: `gemini-flash-latest` |
 | `REGISTER_LIMIT_PER_HOUR`, `LOGIN_LIMIT_PER_15MIN`, `AI_LIMIT_PER_MINUTE` | 5 / 8 / 30 | Limites contra abuso |
+| `WEB_SEARCH_ENABLED` / `WEB_SEARCH_PROVIDER_ORDER` | `false` / `tavily,serper,brave,duckduckgo` | Busca na web do agente (opcional) |
+| `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_API_KEY` | — | Chaves dos provedores de busca (todas opcionais) |
 
 Sem IA o JULIUS funciona por completo: o Quick Input e o assistente usam um interpretador local em português. A IA melhora frases incomuns, lê comprovantes e redige conselhos — **nunca** calcula valores.
 
@@ -91,11 +93,14 @@ Documentação interativa da API (fora de produção): http://127.0.0.1:8010/api
 ## Testes
 
 ```powershell
-cd backend;  & "$env:USERPROFILE\.venvs\julius\Scripts\python.exe" -m pytest      # 111 testes: finanças, futuros, dívidas, documentos, agente, sincronização, migrations
-cd frontend; npx vitest run                                                       # 24 testes: dinheiro e fila offline
-cd frontend; npx tsc --noEmit                                                     # tipos
+cd backend;  & "$env:USERPROFILE\.venvs\julius\Scripts\python.exe" -m pytest      # 115 testes: finanças, futuros, dívidas, documentos, agente, busca na web, sincronização, migrations
+cd backend;  ruff check . ; ruff format --check .                                 # lint e formatação do Python
+cd frontend; npx vitest run                                                       # 25 testes: dinheiro e fila offline
+cd frontend; npx tsc --noEmit; npm run lint                                       # tipos e ESLint
 cd backend;  python -m tests.perf_check                                           # desempenho com 20 mil lançamentos
 ```
+
+**CI:** a cada push/PR o GitHub Actions (`.github/workflows/ci.yml`) roda ruff, pytest, tsc, ESLint, Vitest e o build. Opcional: `pre-commit install` aplica ruff e verificações básicas (inclusive detecção de chave privada) antes de cada commit.
 
 **E2E** (Playwright usando o Edge instalado; 10 fluxos × desktop e celular, incluindo offline, documentos e assistente):
 
@@ -114,6 +119,8 @@ cd frontend; npx vite build; $env:E2E_BASE_URL="http://127.0.0.1:8011"; npx play
 3. **Seu agente do Gemini:** o JULIUS usa o agente pela API do Gemini, no servidor (a chave nunca vai ao navegador). Cole as instruções do seu agente/Gem em Ajustes → IA (ou aponte `AI_AGENT_INSTRUCTIONS_FILE` para um arquivo). As regras de segurança do JULIUS continuam valendo: a IA só usa ferramentas de leitura liberadas e qualquer criação, alteração ou exclusão espera sua confirmação.
 
 Perguntas comuns (saldo, gastos, vencimentos, dívidas…) são respondidas por regras locais na hora, sem gastar cota de IA; o agente entra nas perguntas abertas.
+
+**Busca na web (opcional, desligada por padrão):** com `WEB_SEARCH_ENABLED=true` o agente ganha a ferramenta `web_search` para informações públicas e atuais (Selic, feriados, notícias). Provedores tentados na ordem de `WEB_SEARCH_PROVIDER_ORDER`; os sem chave são pulados — Tavily, Serper e Brave têm plano gratuito com chave, DuckDuckGo funciona sem chave. A consulta sai para o provedor externo, e o agente é instruído a nunca incluir seus dados nela. Desligada, a ferramenta nem é oferecida à IA.
 
 ## Build e Deploy (gratuito)
 
@@ -138,15 +145,18 @@ Os dados pertencem à **conta do usuário**, não ao computador: mesma conta = m
 
 1. No PC 1, rode `powershell -ExecutionPolicy Bypass -File scripts\start-lan.ps1` — ele mostra o endereço da rede, ex.: `http://172.30.2.17:8010`.
 2. No PC 2 (ou celular), abra esse endereço no navegador e faça login com a mesma conta.
-3. Se não aparecer nada, libere a porta 8010 no Firewall do Windows (pergunta “Permitir acesso” na primeira execução).
+3. Se não aparecer nada, libere a porta 8010 no Firewall do Windows (pergunta “Permitir acesso” na primeira execução) **apenas para redes privadas**.
+
+> ⚠️ Nesse modo o tráfego na rede local é HTTP (sem criptografia). Use só em rede de confiança (sua casa), nunca em Wi-Fi público, e mantenha `APP_ENV=development` — em `production` o cookie exige HTTPS e o login não funcionaria por HTTP.
 
 **Opção B — pela internet (qualquer lugar, planos gratuitos)**
 
 1. Deploy no Render + PostgreSQL no Neon conforme a seção *Build e Deploy* acima.
-2. Em qualquer computador: `scripts\setup.ps1` + `scripts\start.ps1`, apontando `API_URL`/o app para o endereço publicado — ou simplesmente abra o endereço do Render no navegador (é um PWA instalável).
-3. Faça login com a mesma conta: o servidor carrega todos os dados (transações, dívidas, futuros, documentos, metas).
+2. Em qualquer computador ou celular, abra o endereço do Render no navegador (é um PWA instalável) e entre com a mesma conta: os dados ficam no servidor.
 
-**Primeira execução em PC novo:** sem banco local prévio — o login baixa tudo do servidor e monta o ambiente local; as alterações offline entram na fila e sincronizam ao reconectar. O logout apenas encerra a sessão; nada é apagado.
+**Opção C — instalação local que sincroniza com o servidor online:** rode o JULIUS no PC (`scripts\start.ps1` ou `JULIUS.exe`) e, em **Ajustes → Sincronização**, informe o endereço publicado, seu e-mail e senha. A primeira vinculação junta categorias e contas padrão e envia/baixa os lançamentos; depois, “Sincronizar agora” faz a ida e volta, e divergências viram conflitos para você decidir. Arquivos de documentos não são sincronizados — só os dados.
+
+O logout apenas encerra a sessão; nada é apagado.
 
 ## Segurança
 
@@ -159,5 +169,12 @@ backend/   app/{api,services,ai,models,security}, migrations/, tests/
 frontend/  src/{pages,components,lib,styles}, e2e/
 desktop/   launcher.py, julius.spec (executável para computador)
 docs/      ARQUITETURA.md, ATUALIZACAO-2.md
-scripts/   setup.ps1, start.ps1, dev.ps1
+scripts/   setup.ps1, start.ps1, start-lan.ps1, dev.ps1
+.github/   CI (GitHub Actions) e Dependabot
 ```
+
+Passos que exigem ação humana (chaves, deploy, publicar o executável): [PASSO_A_PASSO_MANUAL.md](PASSO_A_PASSO_MANUAL.md).
+
+## Créditos
+
+Projeto original: [matheusenaa/JULIUS](https://github.com/matheusenaa/JULIUS). Os commits de CI/lint, busca na web, nova tela de login, ordem da fila offline e acesso pela rede mantêm a autoria de seus autores no histórico deste repositório.

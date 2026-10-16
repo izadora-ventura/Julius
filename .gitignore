@@ -36,9 +36,11 @@ Thumbs.db
 frontend/test-results/
 backend/pyrefly.toml
 
-# Builds de distribuição
+# Builds de distribuição (executáveis e pacotes vão para Releases, não para o Git)
 build/
 dist/
+JULIUS-Installer/
+JULIUS-PORTABLE*.zip
 
 # Neon (contexto local da CLI)
 .neon
